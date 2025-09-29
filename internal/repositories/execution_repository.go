@@ -64,3 +64,23 @@ func (r *ExecutionRepository) GetByID(id uuid.UUID) (*models.Execution, error) {
 	}
 	return &execution, nil
 }
+
+// ListAll retrieves all `Execution` records from the database, ordered by
+// start time in descending order.
+func (r *ExecutionRepository) ListAll() ([]*models.ExecutionWithTrigger, error) {
+	var executions []*models.ExecutionWithTrigger
+	query := `
+	SELECT
+		e.*,
+		t.id AS "trigger.id",
+		t.trigger_type AS "trigger.trigger_type",
+		t.function_name AS "trigger.function_name"
+	FROM executions e
+	JOIN triggers t ON e.trigger_id = t.id
+	ORDER BY e.started_at DESC
+	`
+	if err := r.db.Select(&executions, query); err != nil {
+		return nil, err
+	}
+	return executions, nil
+}

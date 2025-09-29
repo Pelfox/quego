@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -33,8 +34,15 @@ func NewServer() (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	app := echo.New()
+	app.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+	}))
+
 	return &Server{
-		app: echo.New(),
+		app: app,
 		executionService: services.NewExecutionService(
 			repositories.NewExecutionRepository(db),
 		),
@@ -132,6 +140,29 @@ func (s *Server) getExecution(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, execution)
 }
 
+// ListExecutions handles `GET /executions` requests. It retrieves all
+// executions and returns them as JSON.
+func (s *Server) ListExecutions(ctx echo.Context) error {
+	executions, err := s.executionService.ListAllTriggers()
+	if err != nil {
+		fmt.Printf("Error retrieving executions: %v\n", err)
+		return internal.RespondError(
+			ctx,
+			http.StatusInternalServerError,
+			internal.ErrorCodeDatabase,
+			"Failed to retrieve executions",
+		)
+	}
+	return ctx.JSON(http.StatusOK, executions)
+}
+
+// ListFunctions handles `GET /functions` requests. It retrieves all
+// registered functions and returns them as JSON.
+func (s *Server) ListFunctions(ctx echo.Context) error {
+	functions := s.executionService.ListAllFunctions()
+	return ctx.JSON(http.StatusOK, functions)
+}
+
 // Start runs the HTTP server at the given address. Before starting,
 // it ensures the database schema is migrated.
 func (s *Server) Start(addr string) error {
@@ -139,6 +170,8 @@ func (s *Server) Start(addr string) error {
 		return err
 	}
 	s.app.POST("/trigger", s.triggerRoute)
+	s.app.GET("/functions", s.ListFunctions)
+	s.app.GET("/executions", s.ListExecutions)
 	s.app.GET("/executions/:id", s.getExecution)
 	return s.app.Start(addr)
 }

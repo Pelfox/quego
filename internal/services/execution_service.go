@@ -90,3 +90,14 @@ func (s *ExecutionService) Process(trigger *models.Trigger) (*models.Execution, 
 func (s *ExecutionService) GetByID(id uuid.UUID) (*models.Execution, error) {
 	return s.repo.GetByID(id)
 }
+
+// ListAllTriggers retrieves all `Execution` entities from the underlying repository.
+func (s *ExecutionService) ListAllTriggers() ([]*models.ExecutionWithTrigger, error) {
+	return s.repo.ListAll()
+}
+
+// ListAllFunctions returns a slice of all `Function` entities currently
+// registered with the service.
+func (s *ExecutionService) ListAllFunctions() []*models.Function {
+	return s.functions
+}

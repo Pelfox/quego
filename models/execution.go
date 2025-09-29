@@ -49,3 +49,13 @@ type Execution struct {
 	// pending or running.
 	FinishedAt *time.Time `db:"finished_at" json:"finished_at,omitempty"`
 }
+
+// ExecutionWithTrigger represents an execution along with its associated
+// trigger details. It is used for queries that need to return both execution
+// and trigger information together.
+type ExecutionWithTrigger struct {
+	Execution
+	// Trigger refers to the originating trigger that caused this execution to
+	// be created.
+	Trigger Trigger `db:"trigger" json:"trigger"`
+}

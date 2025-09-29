@@ -6,7 +6,7 @@ package models
 type Function struct {
 	// Name is the unique identifier of the function. It must match the
 	// `FunctionName` field of a Trigger for the function to be invoked.
-	Name string
+	Name string `json:"name"`
 	// Exec defines the logic to be executed when the function is triggered. It
 	// receives a pointer to the Trigger that caused the invocation and returns
 	// an error if execution fails. As a side effect, it manages the
