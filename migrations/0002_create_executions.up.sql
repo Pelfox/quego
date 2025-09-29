@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS executions (
+  id BLOB(16) PRIMARY KEY,
+  status NOT NULL CHECK (status in ('PENDING', 'RUNNING', 'COMPLETED', 'FAILED')),
+  trigger_id BLOB(16) NOT NULL,
+  started_at DATETIME DEFAULT NULL,
+  finished_at DATETIME DEFAULT NULL,
+  FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE
+);
