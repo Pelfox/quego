@@ -41,7 +41,7 @@ export function DashoardLayout({ title, mutate, children }: { title: string; mut
       },
       body: JSON.stringify({
         function_name: values.function_name,
-        payload: values.payload ? JSON.parse(values.payload) : undefined,
+        payload: values.payload ? JSON.stringify(values.payload) : undefined,
       }),
     });
     setIsLoading(false);

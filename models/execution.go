@@ -59,3 +59,9 @@ type ExecutionWithTrigger struct {
 	// be created.
 	Trigger Trigger `db:"trigger" json:"trigger"`
 }
+
+type StaleExecution struct {
+	Payload      map[string]any
+	FunctionName string
+	ExecutionID  uuid.UUID
+}

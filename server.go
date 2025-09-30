@@ -1,11 +1,13 @@
 package quego
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/Pelfox/quego/internal"
+	"github.com/Pelfox/quego/internal/dto"
 	"github.com/Pelfox/quego/internal/repositories"
 	"github.com/Pelfox/quego/internal/services"
 	"github.com/Pelfox/quego/models"
@@ -13,6 +15,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/redis/go-redis/v9"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -35,6 +38,10 @@ func NewServer() (*Server, error) {
 		return nil, err
 	}
 
+	redis := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+
 	app := echo.New()
 	app.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: []string{"*"},
@@ -44,6 +51,7 @@ func NewServer() (*Server, error) {
 	return &Server{
 		app: app,
 		executionService: services.NewExecutionService(
+			redis,
 			repositories.NewExecutionRepository(db),
 		),
 		triggerService: services.NewTriggerService(
@@ -64,8 +72,8 @@ func (s *Server) RegisterFunction(name string, f models.ExecFunction) {
 //  2. The trigger is parsed and saved in the database.
 //  3. The corresponding function is executed.
 func (s *Server) triggerRoute(ctx echo.Context) error {
-	var trigger models.Trigger
-	if err := ctx.Bind(&trigger); err != nil {
+	var triggerPayload dto.CreateTriggerDTO
+	if err := ctx.Bind(&triggerPayload); err != nil {
 		return internal.RespondError(
 			ctx,
 			http.StatusBadRequest,
@@ -74,7 +82,11 @@ func (s *Server) triggerRoute(ctx echo.Context) error {
 		)
 	}
 
-	trigger.TriggerType = models.TriggerTypeEvent
+	trigger := models.Trigger{
+		TriggerType:  models.TriggerTypeEvent,
+		FunctionName: triggerPayload.FunctionName,
+		Payload:      triggerPayload.Payload,
+	}
 	if err := s.triggerService.Create(&trigger); err != nil {
 		return internal.RespondError(
 			ctx,
@@ -162,6 +174,11 @@ func (s *Server) Start(addr string) error {
 	if err := internal.MigrateDatabase(); err != nil {
 		return err
 	}
+	if err := s.executionService.RequeueStaled(); err != nil {
+		return err
+	}
+
+	s.executionService.StartWorkers(context.Background())
 	s.app.POST("/trigger", s.triggerRoute)
 	s.app.GET("/executions", s.ListExecutions)
 	s.app.GET("/executions/:id", s.getExecution)

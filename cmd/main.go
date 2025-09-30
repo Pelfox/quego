@@ -16,14 +16,11 @@ func main() {
 		panic(err)
 	}
 
-	server.RegisterFunction(&models.Function{
-		Name: "hello-world",
-		Exec: func(trigger *models.Trigger) error {
-			fmt.Println("Function triggered!")
-			time.Sleep(10 * time.Second)
-			fmt.Println("Function completed!")
-			return nil
-		},
+	server.RegisterFunction("hello-world", func(trigger *models.Trigger) error {
+		fmt.Println("Function triggered!")
+		time.Sleep(10 * time.Second)
+		fmt.Println("Function completed!")
+		return nil
 	})
 
 	if err := server.Start(":8080"); err != nil {

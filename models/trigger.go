@@ -35,5 +35,5 @@ type Trigger struct {
 	FunctionName string `db:"function_name" json:"function_name"`
 	// Payload contains the input data for the function execution. It must
 	// match the defined input schema of the target function.
-	Payload any `json:"payload"`
+	Payload string `db:"payload" json:"-"`
 }
