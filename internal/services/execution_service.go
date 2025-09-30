@@ -37,7 +37,7 @@ func NewExecutionService(
 		redis:     redis,
 		repo:      repo,
 		functions: make(map[string]models.ExecFunction),
-		workerSem: make(chan struct{}, 1),
+		workerSem: make(chan struct{}, 5), // TODO: make this configurable
 	}
 }
 
@@ -85,27 +85,20 @@ func (s *ExecutionService) Process(trigger *models.Trigger) (*models.Execution, 
 		return nil, fmt.Errorf("failed to enqueue job: %w", err)
 	}
 
-	// go func() {
-	// 	if err := s.repo.UpdateStatus(payload.ID, models.ExecutionStatusRunning); err != nil {
-	// 		log.Errorf("Failed to update status for job %s: %v", payload.ID, err)
-	// 		return
-	// 	}
-	// 	if err := f(trigger); err != nil {
-	// 		log.Errorf("Function execution failed for job %s: %v", payload.ID, err)
-	// 		if err := s.repo.UpdateStatus(payload.ID, models.ExecutionStatusFailed); err != nil {
-	// 			log.Errorf("Failed to update status for job %s: %v", payload.ID, err)
-	// 		}
-	// 		return
-	// 	}
-	// 	if err := s.repo.UpdateStatus(payload.ID, models.ExecutionStatusCompleted); err != nil {
-	// 		log.Errorf("Failed to update status for job %s: %v", payload.ID, err)
-	// 		return
-	// 	}
-	// }()
-
 	return payload, nil
 }
 
+// StartWorkers launches worker goroutines that continuously listen for and
+// process jobs from the Redis queue. Each worker retrieves jobs using a
+// blocking pop operation, ensuring efficient resource usage.
+//
+// The number of concurrent workers is limited by the `workerSem` channel,
+// which acts as a semaphore to control concurrency. Each worker processes
+// jobs by looking up the corresponding function and executing it. The status
+// of each job is updated in the repository based on the execution outcome.
+//
+// The method runs indefinitely until the provided context is canceled, at
+// which point it gracefully exits.
 func (s *ExecutionService) StartWorkers(ctx context.Context) {
 	go func() {
 		for {
@@ -168,6 +161,13 @@ func (s *ExecutionService) ListAllTriggers() ([]*models.ExecutionWithTrigger, er
 	return s.repo.ListAll()
 }
 
+// RequeueStaled identifies executions that are in a `Running` state but have
+// not updated for a prolonged period, indicating they may have stalled or
+// crashed. It re-enqueues these executions back into the Redis queue for
+// reprocessing and updates their status to `Pending`.
+//
+// The method logs any errors encountered during the re-enqueueing process but
+// continues processing other staled executions.
 func (s *ExecutionService) RequeueStaled() error {
 	staled, err := s.repo.GetStaled()
 	if err != nil {
