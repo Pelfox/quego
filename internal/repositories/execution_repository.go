@@ -84,3 +84,22 @@ func (r *ExecutionRepository) ListAll() ([]*models.ExecutionWithTrigger, error) 
 	}
 	return executions, nil
 }
+
+func (r *ExecutionRepository) GetStaled() ([]*models.ExecutionWithTrigger, error) {
+	var stales []*models.ExecutionWithTrigger
+	query := `
+	SELECT
+		e.*,
+		t.id AS "trigger.id",
+		t.trigger_type AS "trigger.trigger_type",
+		t.function_name AS "trigger.function_name",
+		t.payload AS "trigger.payload"
+	FROM executions e
+	JOIN triggers t ON e.trigger_id = t.id
+	WHERE e.status != ? AND e.status != ?
+	`
+	if err := r.db.Select(&stales, query, models.ExecutionStatusCompleted, models.ExecutionStatusFailed); err != nil {
+		return nil, err
+	}
+	return stales, nil
+}

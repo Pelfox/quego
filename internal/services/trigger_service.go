@@ -23,9 +23,7 @@ func NewTriggerService(repo *repositories.TriggerRepository) *TriggerService {
 // `Trigger` may not have an ID assigned yet; in such cases, the service is
 // responsible for generating and assigning a unique ID before storing it.
 func (s *TriggerService) Create(trigger *models.Trigger) error {
-	if trigger.ID == nil {
-		triggerID := uuid.New()
-		trigger.ID = &triggerID
-	}
+	triggerID := uuid.New()
+	trigger.ID = &triggerID
 	return s.repo.Create(trigger)
 }

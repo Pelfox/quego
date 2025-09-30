@@ -18,7 +18,7 @@ func NewTriggerRepository(db *sqlx.DB) *TriggerRepository {
 
 // Create inserts a new `Trigger` record into the database.
 func (r *TriggerRepository) Create(data *models.Trigger) error {
-	query := "INSERT INTO triggers (id, trigger_type, function_name) VALUES (:id, :trigger_type, :function_name)"
+	query := "INSERT INTO triggers (id, trigger_type, function_name, payload) VALUES (:id, :trigger_type, :function_name, :payload)"
 	_, err := r.db.NamedExec(query, data)
 	return err
 }
