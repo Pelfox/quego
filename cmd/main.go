@@ -8,10 +8,16 @@ import (
 
 	"github.com/Pelfox/quego"
 	"github.com/Pelfox/quego/models"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
-	server, err := quego.NewServer()
+	server, err := quego.NewServer(quego.ServerConfig{
+		RedisOptions: &redis.Options{
+			Addr: "localhost:6379",
+		},
+		WorkersCount: 3,
+	})
 	if err != nil {
 		panic(err)
 	}

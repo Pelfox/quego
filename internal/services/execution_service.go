@@ -30,6 +30,7 @@ type ExecutionService struct {
 // NewExecutionService creates and returns a new `ExecutionService` instance
 // backed by the provided `ExecutionRepository` and a Redis client.
 func NewExecutionService(
+	workersCount int,
 	redis *redis.Client,
 	repo *repositories.ExecutionRepository,
 ) *ExecutionService {
@@ -37,7 +38,7 @@ func NewExecutionService(
 		redis:     redis,
 		repo:      repo,
 		functions: make(map[string]models.ExecFunction),
-		workerSem: make(chan struct{}, 5), // TODO: make this configurable
+		workerSem: make(chan struct{}, workersCount),
 	}
 }
 

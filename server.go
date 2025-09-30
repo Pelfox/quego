@@ -20,6 +20,14 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// ServerConfig holds configuration options for the Server.
+type ServerConfig struct {
+	// RedisAddr is the address of the Redis server.
+	RedisOptions *redis.Options
+	// WorkersCount is the number of concurrent workers to process function executions.
+	WorkersCount int
+}
+
 // Server represents the HTTP API server. It wires together the Echo instance
 // with services and repositories that provide business and persistence logic.
 type Server struct {
@@ -32,16 +40,13 @@ type Server struct {
 // NewServer initializes and returns a new Server instance. It creates a SQLite
 // database connection, configures repositories, and wires up the execution and
 // trigger services.
-func NewServer() (*Server, error) {
+func NewServer(config ServerConfig) (*Server, error) {
 	db, err := sqlx.Connect("sqlite3", fmt.Sprintf("file:%s", internal.DatabaseFile))
 	if err != nil {
 		return nil, err
 	}
 
-	redis := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
-
+	redis := redis.NewClient(config.RedisOptions)
 	app := echo.New()
 	app.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: []string{"*"},
@@ -51,6 +56,7 @@ func NewServer() (*Server, error) {
 	return &Server{
 		app: app,
 		executionService: services.NewExecutionService(
+			config.WorkersCount,
 			redis,
 			repositories.NewExecutionRepository(db),
 		),
