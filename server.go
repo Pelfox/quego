@@ -54,8 +54,8 @@ func NewServer() (*Server, error) {
 
 // RegisterFunction registers a function with the ExecutionService. Registered
 // functions can later be invoked via triggers.
-func (s *Server) RegisterFunction(f *models.Function) {
-	s.executionService.RegisterFunction(f)
+func (s *Server) RegisterFunction(name string, f models.ExecFunction) {
+	s.executionService.RegisterFunction(name, f)
 }
 
 // triggerRoute handles `POST /trigger` requests.
@@ -156,13 +156,6 @@ func (s *Server) ListExecutions(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, executions)
 }
 
-// ListFunctions handles `GET /functions` requests. It retrieves all
-// registered functions and returns them as JSON.
-func (s *Server) ListFunctions(ctx echo.Context) error {
-	functions := s.executionService.ListAllFunctions()
-	return ctx.JSON(http.StatusOK, functions)
-}
-
 // Start runs the HTTP server at the given address. Before starting,
 // it ensures the database schema is migrated.
 func (s *Server) Start(addr string) error {
@@ -170,7 +163,6 @@ func (s *Server) Start(addr string) error {
 		return err
 	}
 	s.app.POST("/trigger", s.triggerRoute)
-	s.app.GET("/functions", s.ListFunctions)
 	s.app.GET("/executions", s.ListExecutions)
 	s.app.GET("/executions/:id", s.getExecution)
 	return s.app.Start(addr)

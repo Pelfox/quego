@@ -18,19 +18,19 @@ var ErrFunctionNotFound = errors.New("the requested function is not registered")
 // access point for higher layers.
 type ExecutionService struct {
 	repo      *repositories.ExecutionRepository
-	functions []*models.Function
+	functions map[string]models.ExecFunction
 }
 
 // NewExecutionService creates and returns a new `ExecutionService` instance
 // backed by the provided `ExecutionRepository`.
 func NewExecutionService(repo *repositories.ExecutionRepository) *ExecutionService {
-	return &ExecutionService{repo: repo, functions: make([]*models.Function, 0)}
+	return &ExecutionService{repo: repo, functions: make(map[string]models.ExecFunction)}
 }
 
 // RegisterFunction adds a new `Function` to the service in order. Registered
 // functions can later be invoked or managed by the `ExecutionService`.
-func (s *ExecutionService) RegisterFunction(f *models.Function) {
-	s.functions = append(s.functions, f)
+func (s *ExecutionService) RegisterFunction(name string, f models.ExecFunction) {
+	s.functions[name] = f
 }
 
 // Process looks up and executes the function associated with call from the
@@ -43,15 +43,8 @@ func (s *ExecutionService) RegisterFunction(f *models.Function) {
 // If no function matches the trigger's request name, the method returns the
 // `ErrFunctionNotFound` error.
 func (s *ExecutionService) Process(trigger *models.Trigger) (*models.Execution, error) {
-	var targetFunction *models.Function
-	for _, function := range s.functions {
-		if function.Name == trigger.FunctionName {
-			targetFunction = function
-			break
-		}
-	}
-
-	if targetFunction == nil {
+	f, ok := s.functions[trigger.FunctionName]
+	if !ok {
 		return nil, ErrFunctionNotFound
 	}
 
@@ -69,7 +62,7 @@ func (s *ExecutionService) Process(trigger *models.Trigger) (*models.Execution, 
 			log.Errorf("Failed to update status for job %s: %v", payload.ID, err)
 			return
 		}
-		if err := targetFunction.Exec(trigger); err != nil {
+		if err := f(trigger); err != nil {
 			log.Errorf("Function execution failed for job %s: %v", payload.ID, err)
 			if err := s.repo.UpdateStatus(payload.ID, models.ExecutionStatusFailed); err != nil {
 				log.Errorf("Failed to update status for job %s: %v", payload.ID, err)
@@ -94,10 +87,4 @@ func (s *ExecutionService) GetByID(id uuid.UUID) (*models.Execution, error) {
 // ListAllTriggers retrieves all `Execution` entities from the underlying repository.
 func (s *ExecutionService) ListAllTriggers() ([]*models.ExecutionWithTrigger, error) {
 	return s.repo.ListAll()
-}
-
-// ListAllFunctions returns a slice of all `Function` entities currently
-// registered with the service.
-func (s *ExecutionService) ListAllFunctions() []*models.Function {
-	return s.functions
 }
