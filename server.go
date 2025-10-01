@@ -15,9 +15,9 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/redis/go-redis/v9"
-
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog/log"
 )
 
 // ServerConfig holds configuration options for the Server.
@@ -26,6 +26,8 @@ type ServerConfig struct {
 	RedisOptions *redis.Options
 	// WorkersCount is the number of concurrent workers to process function executions.
 	WorkersCount int
+	// CORSOrigins is the string of allowed origins for CORS.
+	CORSOrigins []string
 }
 
 // Server represents the HTTP API server. It wires together the Echo instance
@@ -48,8 +50,9 @@ func NewServer(config ServerConfig) (*Server, error) {
 
 	redis := redis.NewClient(config.RedisOptions)
 	app := echo.New()
+	app.HideBanner = true
 	app.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"*"},
+		AllowOrigins: config.CORSOrigins,
 		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
 	}))
 
@@ -94,6 +97,7 @@ func (s *Server) triggerRoute(ctx echo.Context) error {
 		Payload:      triggerPayload.Payload,
 	}
 	if err := s.triggerService.Create(&trigger); err != nil {
+		log.Error().Err(err).Msg("failed to create trigger")
 		return internal.RespondError(
 			ctx,
 			http.StatusInternalServerError,
@@ -112,6 +116,7 @@ func (s *Server) triggerRoute(ctx echo.Context) error {
 				"The requested function is not registered",
 			)
 		}
+		log.Error().Err(err).Str("id", trigger.ID.String()).Msg("failed to enqueue trigger")
 		return internal.RespondError(
 			ctx,
 			http.StatusInternalServerError,
@@ -139,6 +144,7 @@ func (s *Server) getExecution(ctx echo.Context) error {
 	executionID, _ := uuid.Parse(id)
 	execution, err := s.executionService.GetByID(executionID)
 	if err != nil {
+		log.Error().Err(err).Str("id", id).Msg("failed to get execution")
 		return internal.RespondError(
 			ctx,
 			http.StatusInternalServerError,
@@ -163,7 +169,7 @@ func (s *Server) getExecution(ctx echo.Context) error {
 func (s *Server) ListExecutions(ctx echo.Context) error {
 	executions, err := s.executionService.ListAllTriggers()
 	if err != nil {
-		fmt.Printf("Error retrieving executions: %v\n", err)
+		log.Error().Err(err).Msg("failed to retrieve executions")
 		return internal.RespondError(
 			ctx,
 			http.StatusInternalServerError,
@@ -183,6 +189,19 @@ func (s *Server) Start(addr string) error {
 	if err := s.executionService.RequeueStaled(); err != nil {
 		return err
 	}
+
+	// logging middleware
+	s.app.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			err := next(c)
+			log.Info().Str("path", c.Request().RequestURI).
+				Str("method", c.Request().Method).
+				Str("ip", c.RealIP()).
+				Int("status", c.Response().Status).
+				Msg("processing request")
+			return err
+		}
+	})
 
 	s.executionService.StartWorkers(context.Background())
 	s.app.POST("/trigger", s.triggerRoute)
