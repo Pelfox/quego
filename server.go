@@ -28,6 +28,8 @@ type ServerConfig struct {
 	WorkersCount int
 	// CORSOrigins is the string of allowed origins for CORS.
 	CORSOrigins []string
+	// SQLitePath is the path to the SQLite database.
+	SQLitePath string
 }
 
 // Server represents the HTTP API server. It wires together the Echo instance
@@ -35,6 +37,7 @@ type ServerConfig struct {
 type Server struct {
 	app *echo.Echo
 
+	config           *ServerConfig
 	executionService *services.ExecutionService
 	triggerService   *services.TriggerService
 }
@@ -43,7 +46,7 @@ type Server struct {
 // database connection, configures repositories, and wires up the execution and
 // trigger services.
 func NewServer(config ServerConfig) (*Server, error) {
-	db, err := sqlx.Connect("sqlite3", fmt.Sprintf("file:%s", internal.DatabaseFile))
+	db, err := sqlx.Connect("sqlite3", fmt.Sprintf("file:%s", config.SQLitePath))
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +60,8 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}))
 
 	return &Server{
-		app: app,
+		config: &config,
+		app:    app,
 		executionService: services.NewExecutionService(
 			config.WorkersCount,
 			redis,
@@ -183,7 +187,7 @@ func (s *Server) ListExecutions(ctx echo.Context) error {
 // Start runs the HTTP server at the given address. Before starting,
 // it ensures the database schema is migrated.
 func (s *Server) Start(addr string) error {
-	if err := internal.MigrateDatabase(); err != nil {
+	if err := internal.MigrateDatabase(s.config.SQLitePath); err != nil {
 		return err
 	}
 	if err := s.executionService.RequeueStaled(); err != nil {

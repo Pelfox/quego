@@ -11,15 +11,11 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
-// DatabaseFile is the default filename for the SQLite database used by the
-// server.
-const DatabaseFile = "quego.db"
-
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
 // MigrateDatabase applies database schema migrations.
-func MigrateDatabase() error {
+func MigrateDatabase(sqlitePath string) error {
 	data, err := iofs.New(migrationsFS, "migrations")
 	if err != nil {
 		return err
@@ -27,7 +23,7 @@ func MigrateDatabase() error {
 	migrations, err := migrate.NewWithSourceInstance(
 		"iofs",
 		data,
-		fmt.Sprintf("sqlite3://%s", DatabaseFile),
+		fmt.Sprintf("sqlite3://%s", sqlitePath),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize migrations: %w", err)
