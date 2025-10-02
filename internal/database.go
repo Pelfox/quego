@@ -15,7 +15,7 @@ import (
 // server.
 const DatabaseFile = "quego.db"
 
-//go:embed ../migrations/*.sql
+//go:embed migrations/*.sql
 var migrationsFS embed.FS
 
 // MigrateDatabase applies database schema migrations.
